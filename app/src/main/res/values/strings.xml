@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Converter</string>
+    <string name="celsius">Celsius</string>
+    <string name="fahrenheit">Fahrenheit</string>
+    <string name="absZeroButton">Absolute zero</string>
+    <string name="fahrZeroButton">0°F</string>
+    <string name="iceMeltingButton">Ice melting (0°C)</string>
+    <string name="humanBodyButton">Human body</string>
+    <string name="waterBoilingButton">Water boiling</string>
+</resources>
