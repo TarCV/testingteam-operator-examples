@@ -48,3 +48,18 @@ dependencies {
     androidTestUtil 'androidx.test:orchestrator:1.2.0'
     implementation 'com.google.android.material:material:1.0.0'
 }
+
+tongs {
+    plugins = ['com.github.tarcv.tongs.kiwitcms.KiwiReporterRunRuleFactory']
+
+    configuration = [
+            kiwi: [
+                login: System.getenv("KIWI_LOGIN"),
+                password: System.getenv("KIWI_PASS"),
+                productName: System.getenv("KIWI_PRODUCT"),
+                planName: System.getenv("KIWI_PLAN"),
+                versionName: System.getenv("GIT_SHA"),
+                buildName: System.getenv("BUILD_NUM")
+            ]
+    ]
+}

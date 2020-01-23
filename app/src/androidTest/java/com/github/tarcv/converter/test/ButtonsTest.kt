@@ -6,15 +6,15 @@ import com.agoda.kakao.screen.Screen.Companion.onScreen
 import com.github.tarcv.converter.MainActivity
 import com.github.tarcv.converter.R
 import com.github.tarcv.converter.screens.MainScreen
+import com.github.tarcv.converter.util.Link
 import com.github.tarcv.converter.util.accurateClick
-import com.github.tarcv.converter.util.withProgress
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-import java.util.*
 
 @RunWith(Parameterized::class)
+@Link("https://127.0.0.1:8443/case/1/")
 class ButtonsTest(
     private val buttonLabel: String,
     private val celsiusValue: String,
