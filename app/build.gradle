@@ -54,6 +54,7 @@ tongs {
 
     configuration = [
             kiwi: [
+                baseUrl: System.getenv("KIWI_HOST"),
                 login: System.getenv("KIWI_LOGIN"),
                 password: System.getenv("KIWI_PASS"),
                 productName: System.getenv("KIWI_PRODUCT"),

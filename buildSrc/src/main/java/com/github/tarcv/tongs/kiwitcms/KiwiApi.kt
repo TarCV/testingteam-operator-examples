@@ -1,20 +1,25 @@
 package com.github.tarcv.tongs.kiwitcms
 
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.annotation.JsonInclude.Include
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonValue
-import com.googlecode.jsonrpc4j.*
+import com.googlecode.jsonrpc4j.JsonRpcHttpClient
+import com.googlecode.jsonrpc4j.JsonRpcMethod
+import com.googlecode.jsonrpc4j.JsonRpcParam
+import com.googlecode.jsonrpc4j.ProxyUtil
 import java.net.URL
 
 
 interface KiwiApi {
     @JsonRpcMethod("TestCase.filter")
-    fun testCaseFilter(predicates: List<TestCaseFilter>): List<Any>?
+    fun testCaseFilter(predicates: TestCaseFilter): List<TestCase>
 
-    @JsonRpcMethod("TestPlan.addCase")
-    fun testPlanAddCase(planId: Int, caseId: Int): List<Any>
+    @JsonRpcMethod("TestPlan.add_case")
+    fun testPlanAddCase(planId: Int, caseId: Int)
 
-    @JsonRpcMethod("TestRun.addCase")
+    @JsonRpcMethod("TestRun.add_case")
     fun testRunAddCase(
         @JsonRpcParam("run_id") runId: Int,
         @JsonRpcParam("case_id") caseId: Int
@@ -41,10 +46,6 @@ interface KiwiApi {
     @JsonRpcMethod("TestRun.create")
     fun testRunCreate(info: TestRunFilter): TestRun
 
-    class TestRun(
-        var id: Int
-    )
-
     @JsonRpcMethod("Product.filter")
     fun productFilter(filter: ProductFilter): List<Product>
 
@@ -69,83 +70,164 @@ interface KiwiApi {
     @JsonRpcMethod("TestPlan.create")
     fun testPlanCreate(info: TestPlanCreateTemplate): TestPlan
 
-    class TestPlanType(
-        var id: Int
-    )
-
-    class Classification(
-        var id: Int
-    )
-
-    class TestCaseFilter(
-        @JsonProperty("pk") val caseId: Int,
-        val planId: Int
-    )
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    class TestCase(
+        @get:JsonProperty("case_id") var id: Int?
+    ) {
+        constructor(): this(null)
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    class TestExecution (
-        @JsonProperty("run_id")
-        var runId: Int = 0
-    )
+    @JsonInclude(Include.NON_NULL)
+    class TestRun(
+        @get:JsonProperty("run_id") var id: Int?
+    ) {
+        constructor(): this(null)
+    }
 
-    class TestExecutionValues(var status: TestExecutionStatus)
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    class TestPlanType(
+        @get:JsonProperty("plan_id") var id: Int?
+    ) {
+        constructor(): this(null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    class Classification(
+        var id: Int?
+    ) {
+        constructor(): this(null)
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    class TestCaseFilter(
+        @get:JsonProperty("pk") val caseId: Int?,
+        @get:JsonProperty("plan") val planId: Int?
+    ) {
+        constructor(): this(null, null)
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    class TestExecution(
+        @get:JsonProperty("run_id") var runId: Int? = 0
+    ) {
+        constructor(): this(null)
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    class TestExecutionValues(
+        var status: TestExecutionStatus?
+    ) {
+        constructor(): this(null)
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class ProductBuild(
-        var id: Int
-    )
+        @get:JsonProperty("build_id") var id: Int?
+    ) {
+        constructor(): this(null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class ProductBuildFilter(
-        var product: Int,
-        var name: String
-    )
+        var product: Int?,
+        var name: String?
+    ) {
+        constructor(): this(null, null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class TestRunFilter(
-        @JsonProperty("build") var buildId: Int,
-        var manager: String,
-        @JsonProperty("plan") var planId: Int,
-        var summary: String
-    )
+        @get:JsonProperty("build") var buildId: Int?,
+        var manager: String?,
+        @get:JsonProperty("plan") var planId: Int?,
+        var summary: String?
+    ) {
+        constructor(): this(null, null, null, null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class ProductFilter(
-        var name: String,
-        @JsonProperty("classification_id") var classificationId: Int? = null
-    )
+        var name: String?,
+        @get:JsonProperty("classification_id") var classificationId: Int?
+    ) {
+        constructor(): this(null, null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class Product(
-        var id: Int
-    )
+        var id: Int?
+    ) {
+        constructor(): this(null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class ClassificationFilter {
 
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class ProductVersionFilter(
-        @JsonProperty("product") productId: Int,
-        value: String
-    )
+        @get:JsonProperty("product") var productId: Int?,
+        var value: String?
+    ) {
+        constructor(): this(null, null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class ProductVersion(
-        var id: Int
-    )
+        var id: Int?
+    ) {
+        constructor(): this(null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
     class TestPlanFilter(
-        var name: String,
-        @JsonProperty("product") var productId: Int
-    )
+        var name: String?,
+        @get:JsonProperty("product") var productId: Int?
+    ) {
+        constructor(): this(null, null)
+    }
 
-    class TestPlan (
-        var id: Int
-    )
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    class TestPlan(
+        @get:JsonProperty("plan_id") var id: Int?
+    ) {
+        constructor(): this(null)
+    }
 
-    open class TestPlanTypeFilter(var name: String)
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    open class TestPlanTypeFilter(
+        var name: String?
+    ) {
+        constructor(): this(null)
+    }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     class TestPlanCreateTemplate(
-        @JsonProperty("product") var productId: Int,
-        @JsonProperty("type") var typeId: Int,
-        @JsonProperty("default_product_version") var defaultProductVersion: Int,
-        @JsonProperty("product_version") var productVersion: Int,
+        @get:JsonProperty("product") var productId: Int,
+        @get:JsonProperty("type") var typeId: Int,
+        @get:JsonProperty("default_product_version") var defaultProductVersion: Int,
+        @get:JsonProperty("product_version") var productVersion: Int,
         var text: String,
-        @JsonProperty("is_active") var isActive: Boolean,
+        @get:JsonProperty("is_active") var isActive: Boolean,
         name: String
     ): TestPlanTypeFilter(name)
 
@@ -159,11 +241,23 @@ interface KiwiApi {
 class KiwiService(
     login: String,
     password: String,
-    baseUrl: String = "http://example.com/UserService.json"
+    baseUrl: String
 ) {
-    private val client = JsonRpcHttpClient(
-        URL(baseUrl)
-    )
+    private val client by lazy {
+        val url = baseUrl
+            .let {
+                if (!it.endsWith("/")) {
+                    "$it/"
+                } else {
+                    it
+                }
+            }
+            .let { "${it}json-rpc/" }
+
+        JsonRpcHttpClient(
+            URL(url)
+        )
+    }
 
     private val service: KiwiApi = ProxyUtil.createClientProxy<KiwiApi>(
         javaClass.classLoader,
@@ -171,10 +265,9 @@ class KiwiService(
         client
     )
 
-    private var sessionId: String
-
     init {
-        sessionId = service.authLogin(login, password)
+        val sessionId = service.authLogin(login, password)
+        client.headers = mapOf("Cookie" to "sessionid=$sessionId")
     }
 
     fun close() {
@@ -182,9 +275,9 @@ class KiwiService(
     }
 
     fun addTestCaseToPlan(planId: Int, caseId: Int) {
-        val results = service.testCaseFilter(listOf(KiwiApi.TestCaseFilter(caseId, planId)))
+        val results = service.testCaseFilter(KiwiApi.TestCaseFilter(caseId, planId))
 
-        if (results != null && results.isNotEmpty()) {
+        if (results.isNotEmpty()) {
             service.testPlanAddCase(planId, caseId)
         }
     }
@@ -217,11 +310,11 @@ class KiwiService(
     }
 
     fun getProductId(name: String): Int? {
-        val product = service.productFilter(KiwiApi.ProductFilter(name))
+        val product = service.productFilter(KiwiApi.ProductFilter(name, null))
         return if (product.isEmpty()) {
             null
         } else {
-            product[0].id
+            product[0].id!!
         }
     }
 
@@ -259,13 +352,13 @@ class KiwiService(
         return if (testPlans.isEmpty()) {
             -1
         } else {
-            testPlans[0].id
+            testPlans[0].id!!
         }
     }
 
     fun createNewTP(productId: Int, name: String, versionId: Int): KiwiApi.TestPlan {
-        val planTypeFilter = KiwiApi.TestPlanTypeFilter(name = "Automation")
-        val typeId = service.planTypeFilter(planTypeFilter)[0].id
+        val planTypeFilter = KiwiApi.TestPlanTypeFilter(name = "Acceptance")
+        val typeId = service.planTypeFilter(planTypeFilter)[0].id!!
 
         return service.testPlanCreate(KiwiApi.TestPlanCreateTemplate(
             productId,

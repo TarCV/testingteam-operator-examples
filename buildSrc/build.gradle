@@ -27,6 +27,7 @@ dependencies {
     implementation "com.fasterxml.jackson.core:jackson-annotations:2.8.5"
     implementation 'com.google.guava:guava:24.1-jre'
     implementation "com.github.tarcv.tongs:tongs-plugin-api:$tongs_version"
+    testImplementation "com.github.tarcv.tongs:tongs-runner:$tongs_version"
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-core:2.7.22'
 
