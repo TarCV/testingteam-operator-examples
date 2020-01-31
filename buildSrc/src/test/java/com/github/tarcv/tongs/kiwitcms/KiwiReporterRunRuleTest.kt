@@ -13,8 +13,12 @@ import com.github.tarcv.tongs.runner.rules.TestCaseRunRuleAfterArguments
 import com.github.tarcv.tongs.runner.rules.TestCaseRunRuleContext
 import com.github.tarcv.tongs.summary.ResultStatus
 import com.github.tarcv.tongs.system.io.TestCaseFileManager
+import org.junit.Assert
 import org.junit.Rule
+import org.junit.Test
 import org.junit.rules.MethodRule
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import org.mockito.Mock
 import org.mockito.junit.MockitoJUnit
 
@@ -23,13 +27,16 @@ class KiwiReporterRunRuleTest {
     @JvmField
     val configurationMock: RunConfiguration? = ActualConfiguration(Configuration.aConfigurationBuilder()
         .withPluginConfiguration(mapOf(
-            "baseUrl" to System.getenv("KIWI_HOST"),
-            "login" to System.getenv("KIWI_LOGIN"),
-            "password" to System.getenv("KIWI_PASS"),
-            "productName" to System.getenv("KIWI_PRODUCT"),
-            "planName" to System.getenv("KIWI_PLAN"),
-            "versionName" to System.getenv("GIT_SHA"),
-            "buildName" to System.getenv("BUILD_NUM")
+                "kiwi" to mapOf(
+                "baseUrl" to System.getenv("KIWI_HOST"),
+                "login" to System.getenv("KIWI_LOGIN"),
+                "password" to System.getenv("KIWI_PASS"),
+                "productName" to System.getenv("KIWI_PRODUCT"),
+                "planName" to System.getenv("KIWI_PLAN"),
+                "versionName" to System.getenv("GIT_SHA"),
+                "buildName" to System.getenv("BUILD_NUM"),
+                    "any" to "18"
+            )
         ))
         .build())
 
@@ -44,7 +51,8 @@ class KiwiReporterRunRuleTest {
     @get:Rule
     var mockitoRule: MethodRule = MockitoJUnit.rule()
 
-//    @Test
+    // TODO: rewrite to not use actual JSONRPC client
+    //    @Test // uncomment to test interaction with KiwiTCMS instance
     fun test() {
         val pool = Pool.Builder()
             .withName("testPool")
@@ -87,5 +95,65 @@ class KiwiReporterRunRuleTest {
             emptyList()
         )))
         poolRule.after()
+    }
+}
+
+@RunWith(Parameterized::class)
+class KiwiReporterRunRuleFoldTest(
+    private val a: ResultStatus,
+    private val b: ResultStatus,
+    private val expectedResult: ResultStatus
+) {
+    @Test
+    fun foldStatusesAB() {
+        Assert.assertEquals(expectedResult, KiwiReporterRunRule.foldStatuses(a, b))
+    }
+
+    @Test
+    fun foldStatusesBA() {
+        Assert.assertEquals(expectedResult, KiwiReporterRunRule.foldStatuses(a, b))
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}, {1} -- {2}")
+        fun data() = arrayOf(
+            arrayOf(ResultStatus.PASS, ResultStatus.PASS, ResultStatus.PASS),
+            arrayOf(ResultStatus.PASS, ResultStatus.FAIL, ResultStatus.FAIL),
+            arrayOf(ResultStatus.PASS, ResultStatus.ERROR, ResultStatus.ERROR),
+            arrayOf(ResultStatus.PASS, ResultStatus.IGNORED, ResultStatus.PASS),
+            arrayOf(ResultStatus.PASS, ResultStatus.ASSUMPTION_FAILED, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.PASS, ResultStatus.UNKNOWN, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.FAIL, ResultStatus.PASS, ResultStatus.FAIL),
+            arrayOf(ResultStatus.FAIL, ResultStatus.FAIL, ResultStatus.FAIL),
+            arrayOf(ResultStatus.FAIL, ResultStatus.ERROR, ResultStatus.ERROR),
+            arrayOf(ResultStatus.FAIL, ResultStatus.IGNORED, ResultStatus.FAIL),
+            arrayOf(ResultStatus.FAIL, ResultStatus.ASSUMPTION_FAILED, ResultStatus.FAIL),
+            arrayOf(ResultStatus.FAIL, ResultStatus.UNKNOWN, ResultStatus.FAIL),
+            arrayOf(ResultStatus.ERROR, ResultStatus.PASS, ResultStatus.ERROR),
+            arrayOf(ResultStatus.ERROR, ResultStatus.FAIL, ResultStatus.ERROR),
+            arrayOf(ResultStatus.ERROR, ResultStatus.ERROR, ResultStatus.ERROR),
+            arrayOf(ResultStatus.ERROR, ResultStatus.IGNORED, ResultStatus.ERROR),
+            arrayOf(ResultStatus.ERROR, ResultStatus.ASSUMPTION_FAILED, ResultStatus.ERROR),
+            arrayOf(ResultStatus.ERROR, ResultStatus.UNKNOWN, ResultStatus.ERROR),
+            arrayOf(ResultStatus.IGNORED, ResultStatus.PASS, ResultStatus.PASS),
+            arrayOf(ResultStatus.IGNORED, ResultStatus.FAIL, ResultStatus.FAIL),
+            arrayOf(ResultStatus.IGNORED, ResultStatus.ERROR, ResultStatus.ERROR),
+            arrayOf(ResultStatus.IGNORED, ResultStatus.IGNORED, ResultStatus.IGNORED),
+            arrayOf(ResultStatus.IGNORED, ResultStatus.ASSUMPTION_FAILED, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.IGNORED, ResultStatus.UNKNOWN, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.ASSUMPTION_FAILED, ResultStatus.PASS, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.ASSUMPTION_FAILED, ResultStatus.FAIL, ResultStatus.FAIL),
+            arrayOf(ResultStatus.ASSUMPTION_FAILED, ResultStatus.ERROR, ResultStatus.ERROR),
+            arrayOf(ResultStatus.ASSUMPTION_FAILED, ResultStatus.IGNORED, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.ASSUMPTION_FAILED, ResultStatus.ASSUMPTION_FAILED, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.ASSUMPTION_FAILED, ResultStatus.UNKNOWN, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.UNKNOWN, ResultStatus.PASS, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.UNKNOWN, ResultStatus.FAIL, ResultStatus.FAIL),
+            arrayOf(ResultStatus.UNKNOWN, ResultStatus.ERROR, ResultStatus.ERROR),
+            arrayOf(ResultStatus.UNKNOWN, ResultStatus.IGNORED, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.UNKNOWN, ResultStatus.ASSUMPTION_FAILED, ResultStatus.UNKNOWN),
+            arrayOf(ResultStatus.UNKNOWN, ResultStatus.UNKNOWN, ResultStatus.UNKNOWN)
+        )
     }
 }

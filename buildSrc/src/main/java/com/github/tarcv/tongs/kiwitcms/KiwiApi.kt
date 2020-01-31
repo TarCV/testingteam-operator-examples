@@ -10,6 +10,11 @@ import com.googlecode.jsonrpc4j.JsonRpcMethod
 import com.googlecode.jsonrpc4j.JsonRpcParam
 import com.googlecode.jsonrpc4j.ProxyUtil
 import java.net.URL
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 
 interface KiwiApi {
@@ -25,11 +30,22 @@ interface KiwiApi {
         @JsonRpcParam("case_id") caseId: Int
     ): TestExecution
 
+    @JsonRpcMethod("TestExecution.filter")
+    fun testExecutionFilter(
+        predicates: TestExecutionFilter
+    ): List<TestExecution>
+
     @JsonRpcMethod("TestExecution.update")
     fun testExecutionUpdate(
         @JsonRpcParam("case_run_id") runId: Int,
         @JsonRpcParam("values") values: TestExecutionValues
     ): TestExecution
+
+    @JsonRpcMethod("TestExecution.add_comment")
+    fun testExecutionAddComment(
+        @JsonRpcParam("execution_id") runId: Int,
+        @JsonRpcParam("comment") comment: String
+    )
 
     @JsonRpcMethod("Auth.login")
     fun authLogin(login: String, password: String): String
@@ -70,6 +86,12 @@ interface KiwiApi {
     @JsonRpcMethod("TestPlan.create")
     fun testPlanCreate(info: TestPlanCreateTemplate): TestPlan
 
+    @JsonRpcMethod("TestRun.update")
+    fun testRunUpdate(
+        @JsonRpcParam("run_id") runId: Int,
+        @JsonRpcParam("values") values: TestRun
+    ): TestRun
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(Include.NON_NULL)
     class TestCase(
@@ -81,15 +103,16 @@ interface KiwiApi {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(Include.NON_NULL)
     class TestRun(
-        @get:JsonProperty("run_id") var id: Int?
+        @get:JsonProperty("run_id") var id: Int?,
+        @get:JsonProperty("stop_date") var stopDate: String?
     ) {
-        constructor(): this(null)
+        constructor(): this(null, null)
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(Include.NON_NULL)
     class TestPlanType(
-        @get:JsonProperty("plan_id") var id: Int?
+        var id: Int?
     ) {
         constructor(): this(null)
     }
@@ -114,7 +137,7 @@ interface KiwiApi {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonInclude(Include.NON_NULL)
     class TestExecution(
-        @get:JsonProperty("run_id") var runId: Int? = 0
+        @get:JsonProperty("case_run_id") var caseRunId: Int? = 0
     ) {
         constructor(): this(null)
     }
@@ -231,10 +254,19 @@ interface KiwiApi {
         name: String
     ): TestPlanTypeFilter(name)
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(Include.NON_NULL)
+    class TestExecutionFilter (
+        @get:JsonProperty("run_id") var runId: Int?,
+        @get:JsonProperty("case_id") var caseId: Int?
+    ) {
+        constructor(): this(null, null)
+    }
+
     enum class TestExecutionStatus(@get:JsonValue val value: Int) {
+        IDLE(1),
         PASS(4),
-        FAIL(5),
-        IDLE(1);
+        FAIL(5);
     }
 }
 
@@ -259,7 +291,7 @@ class KiwiService(
         )
     }
 
-    private val service: KiwiApi = ProxyUtil.createClientProxy<KiwiApi>(
+    val service: KiwiApi = ProxyUtil.createClientProxy<KiwiApi>(
         javaClass.classLoader,
         KiwiApi::class.java,
         client
@@ -286,9 +318,28 @@ class KiwiService(
         return service.testRunAddCase(testRunId, testCaseId)
     }
 
-    fun updateTestExecution(runId: Int, status: KiwiApi.TestExecutionStatus): KiwiApi.TestExecution {
+    fun getExecutions(
+        runId: Int,
+        testCaseId: Int
+    ): List<KiwiApi.TestExecution> {
+        return service.testExecutionFilter(
+            KiwiApi.TestExecutionFilter(
+                runId = runId,
+                caseId = testCaseId
+            )
+        )
+    }
+
+    fun updateTestExecution(
+        runId: Int,
+        status: KiwiApi.TestExecutionStatus,
+        comment: String
+    ) {
         val values = KiwiApi.TestExecutionValues(status)
-        return service.testExecutionUpdate(runId, values)
+        service.testExecutionUpdate(runId, values)
+        if (comment.isNotEmpty()) {
+            service.testExecutionAddComment(runId, comment)
+        }
     }
 
     fun getBuilds(filter: KiwiApi.ProductBuildFilter): List<KiwiApi.ProductBuild> {
@@ -368,6 +419,14 @@ class KiwiService(
             "WIP",
             true,
             name
+        ))
+    }
+
+    fun completeRun(runId: Int) {
+        service.testRunUpdate(runId, KiwiApi.TestRun(
+            id = null,
+            stopDate = OffsetDateTime.now(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
         ))
     }
 }

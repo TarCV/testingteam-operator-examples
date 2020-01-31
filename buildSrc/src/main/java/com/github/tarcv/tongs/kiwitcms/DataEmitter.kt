@@ -1,8 +1,6 @@
 package com.github.tarcv.tongs.kiwitcms
 
 import com.github.tarcv.tongs.kiwitcms.KiwiApi.ProductBuildFilter
-import com.github.tarcv.tongs.runner.TestCaseRunResult
-import com.github.tarcv.tongs.summary.ResultStatus
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.net.ssl.HttpsURLConnection
@@ -70,30 +68,37 @@ class DataEmitter(
             }
     }
 
-    fun addResultsToRun(results: List<TestCaseRunResult>) {
-        val testPlanId = planId
+    fun addResultToRun(
+        testCaseId: Int,
+        result: KiwiApi.TestExecutionStatus,
+        comment: String
+    ) {
+        safeAddCaseToPlan(testCaseId)
 
-        for (result in results) {
-            val testCaseId = extractTestCaseId(result.testCase)
-            if (testCaseId != null) {
-                client.addTestCaseToPlan(testPlanId, testCaseId)
-                // TODO: this method should accept casesInTestRun and not call RPC if the TestCase
-                // has already been added inside the TestRun
-                val testExecution = client.addTestCaseToRunId(runId, testCaseId)
-                client.updateTestExecution(testExecution.runId!!, convertStatus(result.status))
-            }
-        }
+        val testExecution = client.getExecutions(runId, testCaseId)
+            .firstOrNull()
+            ?: client.addTestCaseToRunId(runId, testCaseId)
+        client.updateTestExecution(testExecution.caseRunId!!, result, comment)
     }
 
-    private fun convertStatus(status: ResultStatus): KiwiApi.TestExecutionStatus {
-        return when(status) {
-            ResultStatus.PASS -> KiwiApi.TestExecutionStatus.PASS
-            else -> KiwiApi.TestExecutionStatus.FAIL
-        }
+    fun completeRun() {
+        client.completeRun(runId)
     }
 
     fun closeSession() {
         client.close()
+    }
+
+    fun addCasesToPlan(testCases: Collection<Int>) {
+        testCases.forEach(this@DataEmitter::safeAddCaseToPlan)
+    }
+
+    private fun safeAddCaseToPlan(it: Int) {
+        try {
+            client.addTestCaseToPlan(planId, it)
+        } catch (e: Exception) {
+            e.printStackTrace() // TODO
+        }
     }
 
     companion object {

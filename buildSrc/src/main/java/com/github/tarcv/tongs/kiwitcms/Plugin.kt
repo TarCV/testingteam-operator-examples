@@ -1,71 +1,163 @@
 package com.github.tarcv.tongs.kiwitcms
 
 import com.github.tarcv.tongs.model.Pool
+import com.github.tarcv.tongs.model.TestCase
+import com.github.tarcv.tongs.model.TestCaseEvent
 import com.github.tarcv.tongs.runner.rules.*
 import com.github.tarcv.tongs.summary.ResultStatus
+import java.lang.RuntimeException
 import java.util.*
+import kotlin.collections.HashMap
+import kotlin.math.max
 
-public class KiwiReporterRunRuleFactory
+class KiwiReporterRunRuleFactory
     : TestCaseRunRuleFactory<KiwiReporterRunRule>, PoolRunRuleFactory<KiwiReporterPoolRule>,
+        TestCaseRuleFactory<KiwiReporterTestCaseRule>,
         HasConfiguration
 {
-    override val configurationSections: Array<String> = arrayOf("kiwi")
+    private val pluginSectionName = "kiwi"
 
-    private val emitters = Collections.synchronizedMap(HashMap<Pool, NewTestDataEmitter>())
+    override val configurationSections: Array<String> = arrayOf(pluginSectionName)
+
+    private val caseInfos = Collections.synchronizedMap(HashMap<Int, CmsCaseMappingAccumulator>())
+
+    private val emitters = Collections.synchronizedMap(HashMap<Pool, DataEmitter>())
+
+    override fun testCaseRules(context: TestCaseRuleContext): Array<out KiwiReporterTestCaseRule> {
+        return arrayOf(KiwiReporterTestCaseRule(caseInfos))
+    }
 
     override fun testCaseRunRules(context: TestCaseRunRuleContext): Array<out KiwiReporterRunRule> {
-        return arrayOf(KiwiReporterRunRule {
-            val pool: Pool = context.pool
+        val pool: Pool = context.pool
+        return arrayOf(KiwiReporterRunRule(pool, caseInfos) {
             println("KiwiReporterRunRule producer - $pool")
-            val newTestDataEmitter: NewTestDataEmitter? = emitters[pool]
-            newTestDataEmitter!!
+            val dataEmitter: DataEmitter? = emitters[pool]
+            dataEmitter!!
         })
     }
 
     override fun poolRules(context: PoolRunRuleContext): Array<out KiwiReporterPoolRule> {
-        return arrayOf(KiwiReporterPoolRule(context.configuration.pluginConfiguration, context.pool, emitters))
+        val configuration =
+            context.configuration.pluginConfiguration[pluginSectionName] as Map<String, String>
+        return arrayOf(KiwiReporterPoolRule(configuration, context.pool, emitters))
     }
 }
 
-public class KiwiReporterRunRule(
-    private val emitterProvider: () -> NewTestDataEmitter
+class KiwiReporterTestCaseRule(private val caseInfos: MutableMap<Int, CmsCaseMappingAccumulator>)
+    : TestCaseRule {
+    override fun transform(testCaseEvent: TestCaseEvent): TestCaseEvent {
+        val testCase = testCaseEvent.testCase
+        extractTestCaseId(testCase)
+            ?.let { caseId ->
+                caseInfos.computeIfAbsent(caseId) { CmsCaseMappingAccumulator() }
+                    .addMappedCase(testCase)
+            }
+
+        return testCaseEvent
+    }
+}
+
+class KiwiReporterRunRule(
+    private val pool: Pool,
+
+    // TODO: init rules just before using, to remove the need for this lambda
+    private val caseInfos: Map<Int, CmsCaseMappingAccumulator>,
+    private val emitterProvider: () -> DataEmitter
 ) : TestCaseRunRule {
+    private lateinit var emitter: DataEmitter
 
-    override fun after(arguments: TestCaseRunRuleAfterArguments) {
-        val emitter = emitterProvider()
-
-        // TODO: only add test case to a run at the last attempt
-        // TODO: correctly handle multiple JUnit cases representing one case in TCMS
-        emitter.addResultsToRun(listOf(arguments.result))
+    override fun before() {
+        emitter = emitterProvider()
+        val cases = caseInfos.keys
+        emitter.addCasesToPlan(cases)
     }
 
-    private fun convertStatus(status: ResultStatus): String {
-        return if (status == ResultStatus.PASS) {
-            "PASS"
-        } else {
-            "FAIL"
+    override fun after(arguments: TestCaseRunRuleAfterArguments) {
+        // TODO: only add test case to a run at the last attempt
+        synchronized(caseInfos) {
+            val result = arguments.result
+            val testCase = result.testCase
+            val caseId = extractTestCaseId(testCase)
+            if (caseId != null) {
+                caseInfos[caseId]?.apply {
+                    addResult(pool, testCase, result.status)
+                    accumulate(pool) { results ->
+                        val allResults = results.values
+                        val overallStatus =
+                            allResults.fold(allResults.first()) { variantResult, acc ->
+                                foldStatuses(acc, variantResult)
+                            }
+
+                        emitter.addResultToRun(
+                            caseId,
+                            convertStatus(overallStatus),
+                            "${testCase.testClass}#${testCase.testMethod} - ${result.status}"
+                        )
+                    }
+                }
+            }
         }
     }
 
-    override fun before() {
-        // no op
+    companion object {
+        fun convertStatus(status: ResultStatus): KiwiApi.TestExecutionStatus {
+            return when(status) {
+                ResultStatus.UNKNOWN -> KiwiApi.TestExecutionStatus.IDLE
+                ResultStatus.PASS -> KiwiApi.TestExecutionStatus.PASS
+                else -> KiwiApi.TestExecutionStatus.FAIL
+            }
+        }
+
+        fun foldStatuses(
+            acc: ResultStatus,
+            result: ResultStatus
+        ): ResultStatus {
+            val statusIndexes = arrayOf(
+                ResultStatus.IGNORED,
+                ResultStatus.PASS,
+                ResultStatus.UNKNOWN,
+                ResultStatus.FAIL,
+                ResultStatus.ERROR
+            )
+
+            fun statusToInt(status: ResultStatus): Int {
+                return status
+                    .let {
+                        if (it == ResultStatus.ASSUMPTION_FAILED) {
+                            ResultStatus.UNKNOWN
+                        } else {
+                            it
+                        }
+                    }
+                    .let { statusIndexes.indexOf(it) }
+            }
+
+            val accIndex = statusToInt(acc)
+            val resultIndex = statusToInt(result)
+            val totalIndex = max(accIndex, resultIndex)
+            return statusIndexes[totalIndex]
+        }
     }
 }
 
 class KiwiReporterPoolRule(
     private val configuration: Map<String, Any>,
     private val pool: Pool,
-    private val emitters: MutableMap<Pool, NewTestDataEmitter>
+    private val emitters: MutableMap<Pool, DataEmitter>
 ) : PoolRunRule {
     override fun after() {
         println("com.github.tarcv.tongs.kiwitcms.KiwiReporterPoolRule.after - $pool")
-        val emitter = emitters.remove(pool)!!
-        emitter.closeSession()
+        emitters.remove(pool)?.apply {
+            completeRun()
+            closeSession()
+        }
     }
 
     override fun before() {
         println("com.github.tarcv.tongs.kiwitcms.KiwiReporterPoolRule.before - $pool")
-        emitters[pool] = NewTestDataEmitter(
+        println("com.github.tarcv.tongsi.kiwitcms.KiwiReporterPoolRule.before - config: $configuration")
+        emitters[pool] = DataEmitter(
+            configuration["baseUrl"].toString(),
             configuration["login"].toString(),
             configuration["password"].toString(),
             configuration["productName"].toString(),
@@ -75,4 +167,23 @@ class KiwiReporterPoolRule(
         )
     }
 
+}
+
+internal fun extractTestCaseId(testCase: TestCase): Int? {
+    val urlPattern = Regex(".+/case/(\\d+)/?$")
+    val testCaseLink = testCase.annotations
+        .singleOrNull { it.fullyQualifiedName.endsWith(".Link") }
+        ?.properties?.get("value")
+        ?.toString()
+
+    return if (testCaseLink != null) {
+        urlPattern.matchEntire(testCaseLink)
+            ?.destructured
+            ?.let { (caseId) ->
+                caseId.toInt()
+            }
+            ?: throw RuntimeException("Incorrect link: $testCaseLink")
+    } else {
+        null
+    }
 }
