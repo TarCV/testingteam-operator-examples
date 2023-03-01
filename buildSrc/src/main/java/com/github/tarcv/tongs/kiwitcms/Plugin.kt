@@ -1,10 +1,20 @@
 package com.github.tarcv.tongs.kiwitcms
 
-import com.github.tarcv.tongs.model.Pool
-import com.github.tarcv.tongs.model.TestCase
-import com.github.tarcv.tongs.model.TestCaseEvent
-import com.github.tarcv.tongs.runner.rules.*
-import com.github.tarcv.tongs.summary.ResultStatus
+import com.github.tarcv.tongs.api.HasConfiguration
+import com.github.tarcv.tongs.api.devices.Pool
+import com.github.tarcv.tongs.api.run.PoolRunRule
+import com.github.tarcv.tongs.api.run.PoolRunRuleContext
+import com.github.tarcv.tongs.api.run.PoolRunRuleFactory
+import com.github.tarcv.tongs.api.run.ResultStatus
+import com.github.tarcv.tongs.api.run.TestCaseEvent
+import com.github.tarcv.tongs.api.run.TestCaseRunRule
+import com.github.tarcv.tongs.api.run.TestCaseRunRuleAfterArguments
+import com.github.tarcv.tongs.api.run.TestCaseRunRuleContext
+import com.github.tarcv.tongs.api.run.TestCaseRunRuleFactory
+import com.github.tarcv.tongs.api.testcases.TestCase
+import com.github.tarcv.tongs.api.testcases.TestCaseRule
+import com.github.tarcv.tongs.api.testcases.TestCaseRuleContext
+import com.github.tarcv.tongs.api.testcases.TestCaseRuleFactory
 import java.lang.RuntimeException
 import java.util.*
 import kotlin.collections.HashMap
@@ -100,31 +110,31 @@ class KiwiReporterRunRule(
     }
 
     companion object {
-        fun convertStatus(status: ResultStatus): KiwiApi.TestExecutionStatus {
+        fun convertStatus(status: ResultStatus?): KiwiApi.TestExecutionStatus {
             return when(status) {
-                ResultStatus.UNKNOWN -> KiwiApi.TestExecutionStatus.IDLE
+                null -> KiwiApi.TestExecutionStatus.IDLE
                 ResultStatus.PASS -> KiwiApi.TestExecutionStatus.PASS
                 else -> KiwiApi.TestExecutionStatus.FAIL
             }
         }
 
         fun foldStatuses(
-            acc: ResultStatus,
-            result: ResultStatus
-        ): ResultStatus {
+            acc: ResultStatus?,
+            result: ResultStatus?
+        ): ResultStatus? {
             val statusIndexes = arrayOf(
                 ResultStatus.IGNORED,
                 ResultStatus.PASS,
-                ResultStatus.UNKNOWN,
+                null,
                 ResultStatus.FAIL,
                 ResultStatus.ERROR
             )
 
-            fun statusToInt(status: ResultStatus): Int {
+            fun statusToInt(status: ResultStatus?): Int {
                 return status
                     .let {
                         if (it == ResultStatus.ASSUMPTION_FAILED) {
-                            ResultStatus.UNKNOWN
+                            null
                         } else {
                             it
                         }

@@ -1,37 +1,49 @@
 buildscript {
-    ext.kotlin_version = '1.3.61'
-    ext.tongs_version = '0.1-SNAPSHOT'
+    ext.kotlin_version = '1.7.10'
+    ext.tongs_version = 'master-SNAPSHOT'
 
     repositories {
+        mavenCentral()
         google()
-        jcenter()
+        maven { url 'https://jitpack.io' }
     }
     dependencies {
+        modules {
+            module("org.koin:koin-core") {
+                replacedBy("io.insert-koin:koin-core", 'group is changed')
+            }
+        }
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
 repositories {
-    mavenLocal()
+    mavenCentral()
     google()
-    jcenter()
+    maven { url 'https://jitpack.io' }
 }
 
 apply plugin: 'java-library'
 apply plugin: 'kotlin'
 
 dependencies {
+    modules {
+        module("org.koin:koin-core") {
+            replacedBy("io.insert-koin:koin-core", 'group is changed')
+        }
+    }
+
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 
     implementation 'com.github.briandilley.jsonrpc4j:jsonrpc4j:1.5.3'
     implementation "com.fasterxml.jackson.core:jackson-annotations:2.8.5"
     implementation 'com.google.guava:guava:24.1-jre'
-    implementation "com.github.tarcv.tongs:tongs-plugin-api:$tongs_version"
-    testImplementation "com.github.tarcv.tongs:tongs-runner:$tongs_version"
+    implementation "com.github.TarCV.testingteam-operator:tongs-plugin-api:$tongs_version"
+    implementation "io.insert-koin:koin-core:2.1.6" // should be the same version as in testingteam-operator
+    testImplementation "com.github.TarCV.testingteam-operator:tongs-runner:$tongs_version"
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-core:2.7.22'
-
 }
 
-sourceCompatibility = "7"
-targetCompatibility = "7"
+sourceCompatibility = "8"
+targetCompatibility = "8"

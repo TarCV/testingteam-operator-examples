@@ -1,8 +1,8 @@
 package com.github.tarcv.tongs.kiwitcms
 
-import com.github.tarcv.tongs.model.Pool
-import com.github.tarcv.tongs.model.TestCase
-import com.github.tarcv.tongs.summary.ResultStatus
+import com.github.tarcv.tongs.api.devices.Pool
+import com.github.tarcv.tongs.api.testcases.TestCase
+import com.github.tarcv.tongs.api.run.ResultStatus
 import java.util.HashSet
 import javax.annotation.concurrent.GuardedBy
 import javax.annotation.concurrent.ThreadSafe
@@ -36,10 +36,10 @@ class CmsCaseMappingAccumulator {
         }
     }
 
-    fun accumulate(pool: Pool, consumer: (Map<TestCase, ResultStatus>) -> Unit) {
+    fun accumulate(pool: Pool, consumer: (Map<TestCase, ResultStatus?>) -> Unit) {
         val accumulatedResults = synchronized(this) {
             val defaultResults = knownCases
-                .map { testCase -> testCase to ResultStatus.UNKNOWN }
+                .map { testCase -> testCase to null }
                 .asSequence()
             val actualResults = mappedResults
                 .filter { it.key.first == pool }
